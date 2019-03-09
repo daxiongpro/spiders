@@ -4,6 +4,6 @@ using namespace std;
 
 int main()
 {
-	system("python src/main.py");
+	system("python src/windows_main.py");
 	return 0;
 }
