@@ -71,7 +71,6 @@ with open(url_path, "rb") as url_txt:
         print(url_meta)
         file_url_meta, file_name_normal_meta = get_json(url_meta)
         download_song(file_url_meta, file_name_normal_meta)
-    os.system("pause")
     # file_name, file_name_normal = get_json(url_txt_name)
 
 
