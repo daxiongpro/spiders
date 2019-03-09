@@ -1,2 +1,2 @@
 #! /bin/bash  # employ bash shell
-python src/main.py
+python src/linux_main.py
