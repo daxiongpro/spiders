@@ -1,4 +1,5 @@
 0. 需要Python版本在3.6及以上，并且装好了bs4，urllib，lxml库，如果没有安装，程序会报错，请自行安装。
+   一般而言，urllib和lxml已经是Python自带库了，所以一般而言只需要pip install bs4即可。
 
 1. 把全民k歌中需要下载的歌曲的页面链接输入到url.txt中，可以批量下载，如
 
