@@ -1,4 +1,6 @@
-﻿0. 需要Python版本在3.6及以上
+Web版 http://wesing.zhangkexuan.cn
+
+0. 需要Python版本在3.6及以上
 
 1. 把全民k歌中需要下载的歌曲的页面链接输入到url.txt中，可以批量下载，如
 
