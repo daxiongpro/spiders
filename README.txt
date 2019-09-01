@@ -1,4 +1,4 @@
-Web版 http://wesing.zhangkexuan.cn
+Web版 http://code4world.cn:6688
 
 0. 需要Python版本在3.6及以上
 
