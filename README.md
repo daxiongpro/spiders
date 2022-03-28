@@ -4,14 +4,19 @@
 
 全民K歌需要vip才能下载，故写了这个爬虫，以便于免费爬取朋友的歌
 
-#### 准备：
+#### 如何使用：
 
-* 需要Python版本在3.6及以上
 * 把全民k歌中需要下载的歌曲的页面链接输入到url.txt中，可以批量下载，如
 
 `https://node.kg.qq.com/play?s=qCrUWbqtXTSCdqR5&shareuid=659b9882232b348236&topsource=a0_pn201001003_z11_u765766392_l1_t1648449575__&chain_share_id=_UGWekeQ_P2Xgdme-tM5rSnxKZ_deDOmKWeHyZ1f1jM&pageId=details_of_creations`
 
 * 本程序已经默认存放了样例歌曲链接至url.txt，按照该格式输入链接即可
+* 运行`windows_main.exe`
+* 打开download_songs文件夹，即可发现歌曲已经下载
+
+#### 开发准备：
+
+* 需要Python版本在3.6及以上
 * Windows运行`windows_main.py `自动下载，下载至download_songs中
 
 #### 提示
