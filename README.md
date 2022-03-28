@@ -17,7 +17,7 @@
 #### 开发准备：
 
 * 需要Python版本在3.6及以上
-* Windows运行`windows_main.py `自动下载，下载至download_songs中
+* Windows运行`python src/windows_main.py `自动下载，下载至download_songs中
 
 #### 提示
 
