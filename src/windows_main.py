@@ -19,7 +19,7 @@ def get_json(url):
 
     soup = BeautifulSoup(data, "lxml")  # 返回BeautifulSoup对象，使用lxml解析器
 
-    target_info_str = str(soup.findAll('script')[-6].get_text())[18:-2]  # 找到对应我们目标标签中的json内容
+    target_info_str = str(soup.findAll('script')[2].get_text())[18:-2]  # 找到对应我们目标标签中的json内容
 
     # print(target_info_str)  # 打印目标信息json
 
@@ -47,7 +47,7 @@ def get_json(url):
     song_name = json_dic['detail']['song_name']
 
     # 得到默认文件名
-    file_name_normal = user_name + "_" + song_name + ".m4a"
+    file_name_normal = song_name + ".m4a"
 
     # 打印默认文件名
     print(file_name_normal)
@@ -59,7 +59,11 @@ def get_json(url):
 def download_song(file_url, file_name_normal):
     # 下载文件到main.py同级目录
     print("下载中")
-    f = urllib.request.urlopen(file_url)
+    ua_header = {"User-Agent": "Mozilla/5.0 (compatible; MSIE 9.0; Windows NT 6.1; Trident/5.0;"}
+
+    request = urllib.request.Request(url=file_url, headers=ua_header)
+    f = urllib.request.urlopen(request)
+    # f = urllib.request.urlopen(file_url, headers=ua_header)
     with open(song_path + file_name_normal, "wb") as code:
         code.write(f.read())
         print("下载成功")
