@@ -1,28 +1,46 @@
-### 全民K歌歌曲爬虫下载
+# 爬虫集合
 
-#### 说明：
+本项目汇总一些爬虫，目前已经包含：全民k歌歌曲、小红书图片爬取（无水印）
 
-全民K歌需要vip才能下载，故写了这个爬虫，以便于免费爬取朋友的歌
+## 使用方法：
 
-#### 如何使用：
+### 全民k歌
 
-* 把全民k歌中需要下载的歌曲的页面链接输入到url.txt中，可以批量下载，如
+* 打开 `src/quanminkge_spider.py`。
+* 修改 `urls`。
+* 运行程序。
 
-`https://node.kg.qq.com/play?s=qCrUWbqtXTSCdqR5&shareuid=659b9882232b348236&topsource=a0_pn201001003_z11_u765766392_l1_t1648449575__&chain_share_id=_UGWekeQ_P2Xgdme-tM5rSnxKZ_deDOmKWeHyZ1f1jM&pageId=details_of_creations`
+```bash
+python src/quanminkge_spider.py
+```
 
-* 本程序已经默认存放了样例歌曲链接至url.txt，按照该格式输入链接即可
-* 运行`windows_main.exe`
-* 打开download_songs文件夹，即可发现歌曲已经下载
+> 歌曲会下载到 download_songs 文件夹内。
 
-#### 开发准备：
+### 小红书
 
-* 需要Python版本在3.6及以上
-* Windows运行`python src/windows_main.py `自动下载，下载至download_songs中
+获取自己的 `cookies` ：
 
-#### 提示
+* 打开小红书网站的某个帖子：`https://www.xiaohongshu.com/explore/63974cc9000000001f0134b4`
+* 登录小红书账号
+* 游览器按 `F12`。
+* 点击“网络”。
+* ctrl+F 输入 `cookie`，复制随便一个包的 cookie 。
 
-除了可以删除download_songs下的歌曲文件，请不要删除任何文件及文件夹！
+修改小红书爬虫 `urls` 和 `cookies` ：
 
-#### 致谢：
+* 打开 `src/redbook_spider.py`。
+* 修改 `urls`。
+* 修改自己的 `cookies`。
 
-[zzxzzk115-kgqqDownloader](https://github.com/zzxzzk115/kgqqDownloader)
+运行程序：
+
+```bash
+python src/redbook_spider.py
+```
+
+> 图片会下载到 `images/` 文件夹。
+
+## 致谢：
+
+[全民k歌](https://github.com/zzxzzk115/kgqqDownloader)
+[小红书](https://github.com/littlePig-zzf/python-demo)
