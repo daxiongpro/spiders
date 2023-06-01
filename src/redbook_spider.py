@@ -4,6 +4,9 @@ import os
 import re
 import json
 
+import cv2
+import numpy as np
+
 urls = [
     'https://www.xiaohongshu.com/explore/63974cc9000000001f0134b4',
     # 'https://www.xiaohongshu.com/explore/60a5f16f0000000021034cb4'
@@ -76,12 +79,10 @@ def download(url, filename, folder):
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/55.0.2883.87 UBrowser/6.2.4098.3 Safari/537.36',
     }
 
-    with open(f'images/{folder}/{filename}.jpg', 'wb') as v:
-        try:
-            r = requests.get(url, headers=headers)
-            v.write(r.content)
-        except Exception as e:
-            print('图片下载错误！')
+    r = requests.get(url, headers=headers)
+    np_array = np.frombuffer(r.content, np.uint8)
+    image = cv2.imdecode(np_array, cv2.IMREAD_COLOR)
+    cv2.imwrite(f'images/{folder}/{filename}.jpg', image)
 
 
 def roopLink(urls):
