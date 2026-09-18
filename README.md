@@ -1,46 +1,67 @@
-# 爬虫集合
+# 抖音收藏文案整理
 
-本项目汇总一些爬虫，目前已经包含：全民k歌歌曲、小红书图片爬取（无水印）
+把抖音收藏视频的口播逐字稿批量提取为 Markdown。
 
-## 使用方法：
+链路：**抖音收藏夹 → 下载 → 飞书妙记转写 → 保存为 MD**
 
-### 全民k歌
+## 目录结构
 
-* 打开 `src/quanminkge_spider.py`。
-* 修改 `urls`。
-* 运行程序。
-
-```bash
-python src/quanminkge_spider.py
+```
+spiders/
+├── scripts/               入口脚本（均位于此，统一从这里运行）
+│   ├── fetch_only.py          下载视频（抖音接口取直链 → 下载 MP4 到 _temp_audio）
+│   ├── lark_transcribe.py     飞书妙记转写（MP4 → 逐字稿 MD）
+│   ├── status.py              进度查看（自检 + 各分类统计）
+│   ├── run_pipeline.py        按分类自动流水线（下载+转写，断点续传）
+│   ├── progress_dashboard.py  本地进度看板（http://localhost:8137）
+│   └── cleanup.py             清理中间产物（不动 MD 成品）
+├── config/               分类清单（9 个 list_*.json，视频元数据 + 播放地址）
+├── src/                 共享库
+│   ├── douyin_api.py      抖音接口封装（取直链 / 读登录态）
+│   └── douyin_sign.py     抖音签名
+├── output/douyin/storage_state.json   抖音登录态（勿提交，运行时用）
+├── requirements.txt       依赖：requests, av
+└── README.md
 ```
 
-> 歌曲会下载到 download_songs 文件夹内。
+输出：`spiders` 的同级目录 `抖音收藏文案整理/<分类>/<序号>_标题.md`
 
-### 小红书
+## 环境准备
 
-获取自己的 `cookies` ：
+1. Python 3，安装依赖：
+   ```
+   pip install -r requirements.txt
+   ```
+   `av`（PyAV）用于下载后校验音轨是否正常。
+2. 抖音登录态：`output/douyin/storage_state.json` 必须存在且有效（约 30 天内）。
+   失效需重新登录抖音后导出最新登录态覆盖该文件。
+3. 飞书授权：转写走飞书妙记，需 `lark-cli` 已登录（用户身份）。授权：
+   ```
+   lark-cli auth login --no-wait --json --domain drive,minutes
+   ```
+   用飞书 App 扫码确认。飞书开放平台后台需给该应用开通
+   `drive`（`drive:drive` / `drive:file` / `drive:file:upload`）与 `minutes` 权限并发布。
+4. 路径：脚本会自动以「项目根（spiders 目录）」定位 `config/`、`src/`、`output/`，
+   输出目录默认为根目录的同级 `抖音收藏文案整理`。换机器用环境变量覆盖：
+   ```
+   set DOUYIN_BASE=X:/path/to/spiders
+   set DOUYIN_OUT=X:/path/to/抖音收藏文案整理
+   ```
 
-* 打开小红书网站的某个帖子：`https://www.xiaohongshu.com/explore/63974cc9000000001f0134b4`
-* 登录小红书账号
-* 游览器按 `F12`。
-* 点击“网络”。
-* ctrl+F 输入 `cookie`，复制随便一个包的 cookie 。
+## 用法
 
-修改小红书爬虫 `urls` 和 `cookies` ：
+所有命令都在 `scripts/` 目录下运行（或带路径调用）：
 
-* 打开 `src/redbook_spider.py`。
-* 修改 `urls`。
-* 修改自己的 `cookies`。
+- 查看进度：`python -u scripts/status.py [--detail]`
+- 单分类手动跑：先 `python -u scripts/fetch_only.py --category 探店·吃喝`，再 `python -u scripts/lark_transcribe.py`
+- 一键按序跑完（推荐）：`python -u scripts/run_pipeline.py`
+  自动按 未分类 → 探店·吃喝 → 家庭·婚姻 → 生活·出行 → 娱乐·休闲 顺序，
+  分块下载+转写，转写失败自动标记存档，断点续传（已处理的幂等跳过）。
+- 进度看板：`python -u scripts/progress_dashboard.py`，浏览器开 `http://localhost:8137`
+- 清理中间产物：`python -u scripts/cleanup.py`（预览）/ `python -u scripts/cleanup.py --do`（执行）
 
-运行程序：
+## 备注
 
-```bash
-python src/redbook_spider.py
-```
-
-> 图片会下载到 `images/` 文件夹。
-
-## 致谢：
-
-[全民k歌](https://github.com/zzxzzk115/kgqqDownloader)
-[小红书](https://github.com/littlePig-zzf/python-demo)
+- 代理会阻断抖音，脚本已自动清除 `http(s)_proxy` 环境变量。
+- 转写失败的视频会生成 `<序号>_【转写失败】标题.md` 占位，不再重复重试。
+- 抖音 / 飞书令牌失效时流水线会停止并写 `PIPELINE_HALT_AUTH`，重授权后重跑即可。

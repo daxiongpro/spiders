@@ -1,5 +1,18 @@
+# 编辑器
 .idea
 .vscode
-download_songs
-images
-cookies.txt
+
+# Python（scripts/ 与 src/ 下的缓存均忽略）
+__pycache__/
+*.pyc
+
+# 抖音登录态与浏览器缓存（含凭证，切勿提交）
+output/
+
+# 运行期本地状态（脚本生成的临时文件）
+_status.txt
+_realtime.json
+_pipeline.log
+_lark_qr.png
+
+# 说明：config/ 下的 list_*.json 是输入数据，需纳入版本管理，不要忽略。
