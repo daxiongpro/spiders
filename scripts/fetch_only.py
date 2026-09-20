@@ -20,11 +20,15 @@ import time
 BASE = os.environ.get("DOUYIN_BASE") or os.path.dirname(
     os.path.dirname(os.path.abspath(__file__)))
 LIST_DIR = os.path.join(BASE, "config")  # 分类清单目录
-SS = os.path.join(BASE, "output", "douyin", "storage_state.json")
-OUT_CAT = os.environ.get("DOUYIN_OUT") or os.path.join(
-    os.path.dirname(BASE), "抖音收藏文案整理")
-TMP = os.path.join(OUT_CAT, "_temp_audio")
-TRASH = os.path.join(OUT_CAT, "_trash")
+
+# 路径统一由 src/paths.py 提供，避免多处写死后不一致的毛病
+sys.path.insert(0, os.path.join(BASE, "src"))
+from paths import storage_state, out_dir, temp_audio, trash_dir  # noqa: E402
+
+SS = storage_state()
+OUT_CAT = out_dir()                 # MD 成品目录（仓库内 output/文案）
+TMP = temp_audio()                  # 下载的音视频暂存（仓库内 output/_temp_audio）
+TRASH = trash_dir()                 # 回收站（仓库内 output/_trash）
 
 
 def trash(path):

@@ -20,10 +20,15 @@ from time import time
 BASE = os.environ.get("DOUYIN_BASE") or os.path.dirname(
     os.path.dirname(os.path.abspath(__file__)))
 LIST_DIR = os.path.join(BASE, "config")  # 分类清单目录
-OUT_CAT = os.environ.get("DOUYIN_OUT") or os.path.join(
-    os.path.dirname(BASE), "抖音收藏文案整理")
-TMP = os.path.join(OUT_CAT, "_temp_audio")
-SS = os.path.join(BASE, "output", "douyin", "storage_state.json")
+
+# 路径统一由 src/paths.py 提供
+sys.path.insert(0, os.path.join(BASE, "src"))
+from paths import storage_state, out_dir, temp_audio, media_root  # noqa: E402
+
+OUT_CAT = out_dir()                 # MD 成品目录
+MEDIA_ROOT = media_root()           # 中间产物根目录
+TMP = temp_audio()
+SS = storage_state()
 SEQ = re.compile(r"seq(\d+)_")
 
 CATS = ["搞钱·事业", "投资·理财", "求职·职场", "学习·成长", "探店·吃喝",
@@ -156,7 +161,7 @@ def main():
     except Exception:
         pass
     for name in ("_temp_audio", "_tr", "_trash"):
-        p = os.path.join(OUT_CAT, name)
+        p = os.path.join(MEDIA_ROOT, name)
         if os.path.isdir(p):
             fs = [x for x in glob.glob(os.path.join(p, "**", "*"), recursive=True)
                   if os.path.isfile(x)]

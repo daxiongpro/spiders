@@ -8,9 +8,13 @@
 import glob, json, os, re, shutil, subprocess, sys, threading, time
 
 SP  = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # 项目根 spiders
-OUT = os.environ.get("DOUYIN_OUT") or os.path.join(
-    os.path.dirname(SP), "抖音收藏文案整理")
-TA  = os.path.join(OUT, "_temp_audio")
+
+# 路径统一由 src/paths.py 提供，避免多处写死后不一致
+sys.path.insert(0, os.path.join(SP, "src"))
+from paths import out_dir, temp_audio  # noqa: E402
+
+OUT = out_dir()                 # MD 成品目录（仓库内 output/文案）
+TA  = temp_audio()              # 下载的音视频暂存（仓库内 output/_temp_audio）
 
 
 def find_python():

@@ -9,9 +9,13 @@ import os, re, json, glob, threading, time
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
 SP  = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # 项目根 spiders
-OUT = os.environ.get("DOUYIN_OUT") or os.path.join(
-    os.path.dirname(SP), "抖音收藏文案整理")
-TA  = os.path.join(OUT, "_temp_audio")
+
+# 路径统一由 src/paths.py 提供
+sys.path.insert(0, os.path.join(SP, "src"))
+from paths import out_dir, temp_audio  # noqa: E402
+
+OUT = out_dir()
+TA  = temp_audio()
 LOG = os.path.join(SP, "_pipeline.log")
 RT  = os.path.join(SP, "_realtime.json")
 PORT = 8137

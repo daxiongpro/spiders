@@ -44,18 +44,22 @@ for _c in LARK_CANDIDATES:
 
 # ---- 路径默认取项目根（脚本在 scripts/ 下，故为上级目录），换电脑用环境变量覆盖 ----
 #   set DOUYIN_BASE=X:\path\to\spiders
-#   set DOUYIN_OUT=X:\path\to\抖音收藏文案整理
+#   set DOUYIN_OUT=X:\path\to\spiders\output\文案
 BASE = os.environ.get("DOUYIN_BASE") or os.path.dirname(
     os.path.dirname(os.path.abspath(__file__)))
 LIST_DIR = os.path.join(BASE, "config")  # 分类清单目录
-# 默认：BASE 同级目录下的「抖音收藏文案整理」，与原机器布局一致
-OUT_CAT = os.environ.get("DOUYIN_OUT") or os.path.join(
-    os.path.dirname(BASE), "抖音收藏文案整理")
-TMP_AUDIO = os.path.join(OUT_CAT, "_temp_audio")
+
+# 路径统一由 src/paths.py 提供
+sys.path.insert(0, os.path.join(BASE, "src"))
+from paths import out_dir, media_root, temp_audio, work_root, trash_dir  # noqa: E402
+
+OUT_CAT = out_dir()                 # MD 成品目录（仓库内 output/文案）
+MEDIA_ROOT = media_root()           # 中间产物根目录（仓库内 output）
+TMP_AUDIO = temp_audio()
 # lark-cli 输出白名单只放行「当前工作目录 / 系统 temp / ~/files」。
-# 把 cwd 设为 OUT_CAT，中间产物就能落在 D 盘，而不是 C 盘 %TEMP%。
-WORK_ROOT = os.path.join(OUT_CAT, "_tr")
-TRASH = os.path.join(OUT_CAT, "_trash")
+# cwd 设成 MEDIA_ROOT（而不是 OUT_CAT），中间产物落在 output/ 下，不会混进 MD 成品目录。
+WORK_ROOT = work_root()
+TRASH = trash_dir()
 
 
 def trash(path):
@@ -137,7 +141,7 @@ def extract_audio(mp4: str, dst: str) -> str:
 
 def drive_upload(path: str) -> str:
     p = run([LARK, "drive", "+upload", "--file", path, "--format", "json"],
-            timeout=7200, cwd=OUT_CAT)
+            timeout=7200, cwd=MEDIA_ROOT)
     d = jout(p)
     tok = ""
     for key in ("file_token", "token"):
@@ -155,7 +159,7 @@ def drive_upload(path: str) -> str:
 
 def minutes_upload(file_token: str) -> str:
     p = run([LARK, "minutes", "+upload", "--file-token", file_token,
-             "--format", "json"], timeout=3600, cwd=OUT_CAT)
+             "--format", "json"], timeout=3600, cwd=MEDIA_ROOT)
     d = jout(p)
     tok = ((d.get("data") or {}).get("minute_token")) or d.get("minute_token") or ""
     if not tok:
@@ -186,7 +190,7 @@ def poll_transcript(minute_token: str, out_dir: str,
     while time.time() < deadline:
         run([LARK, "minutes", "+detail", "--minute-tokens", minute_token,
              "--transcript", "--keyword", "--output-dir", out_dir,
-             "--format", "json"], timeout=600, cwd=OUT_CAT)
+             "--format", "json"], timeout=600, cwd=MEDIA_ROOT)
         hit = find_transcript(out_dir)
         if hit:
             try:

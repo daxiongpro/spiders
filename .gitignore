@@ -6,8 +6,20 @@
 __pycache__/
 *.pyc
 
-# 抖音登录态与浏览器缓存（含凭证，切勿提交）
-output/
+# MD 成品 output/文案/ 必须入库，其余一律忽略。
+# 不能整条忽略 output/，否则成品提交不上去；反过来也不能整条放开，
+# 否则会把登录态凭证和几十 MB 音视频提交进来。
+output/*
+!output/文案/
+
+# 抖音登录态（含 Cookie 凭证，切勿提交）
+output/douyin/
+# 下载的音视频与中间产物
+output/_temp_audio/
+output/_tr/
+output/_trash/
+output/_temp_transcript/
+output/_temp_test_audio/
 
 # 运行期本地状态（脚本生成的临时文件）
 _status.txt

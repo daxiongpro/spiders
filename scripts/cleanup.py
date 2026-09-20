@@ -12,12 +12,16 @@ import re
 import shutil
 import sys
 
-# 默认取项目根（脚本在 scripts/ 下，故为上级目录）及其同级「抖音收藏文案整理」，
-# 换机器用环境变量覆盖
+# 默认取项目根（脚本在 scripts/ 下，故为上级目录），换机器用环境变量覆盖
 BASE = os.environ.get("DOUYIN_BASE") or os.path.dirname(
     os.path.dirname(os.path.abspath(__file__)))
-OUT = os.environ.get("DOUYIN_OUT") or os.path.join(
-    os.path.dirname(BASE), "抖音收藏文案整理")
+
+# 路径统一由 src/paths.py 提供
+sys.path.insert(0, os.path.join(BASE, "src"))
+from paths import out_dir, media_root  # noqa: E402
+
+OUT = out_dir()                 # MD 成品目录（只在这里找已转写的 MD）
+MEDIA = media_root()            # 中间产物根目录（要清理的目标都在这儿）
 SEQ = re.compile(r"seq(\d+)_")
 
 CATS = ["学习·成长", "投资·理财", "探店·吃喝", "搞钱·事业", "求职·职场",
@@ -61,25 +65,27 @@ def main():
 
     # 1) 整体可回收目录
     for name in ("_trash", "_tr", "_temp_transcript", "_temp_test_audio"):
-        d = os.path.join(OUT, name)
+        d = os.path.join(MEDIA, name)
         sz, cnt = dirsize(d)
         if sz:
             plans.append((f"{name}  ({cnt} 文件, {human(sz)})", d))
             freed += sz
 
     # 2) _temp_audio 里已生成 MD 的临时视频
-    tmp = os.path.join(OUT, "_temp_audio")
+    tmp = os.path.join(MEDIA, "_temp_audio")
     stale = []
-    for f in glob.glob(os.path.join(tmp, "*.mp4")):
-        m = SEQ.search(os.path.basename(f))
-        if m and int(m.group(1)) in done:
-            try:
-                stale.append((f, os.path.getsize(f)))
-            except OSError:
-                pass
+    # 注意别只扫 mp4：抽音频阶段还会留下 mp3 / m4a / m4s，漏扫就是几十 MB 常年堆积
+    for ext in ("mp4", "mp3", "m4a", "m4s"):
+        for f in glob.glob(os.path.join(tmp, f"*.{ext}")):
+            m = SEQ.search(os.path.basename(f))
+            if m and int(m.group(1)) in done:
+                try:
+                    stale.append((f, os.path.getsize(f)))
+                except OSError:
+                    pass
     if stale:
         sz = sum(s for _, s in stale)
-        plans.append((f"_temp_audio 中已转写的 {len(stale)} 个 mp4 ({human(sz)})",
+        plans.append((f"_temp_audio 中已转写的 {len(stale)} 个中间文件 ({human(sz)})",
                       "STALE"))
         freed += sz
 

@@ -18,13 +18,19 @@ spiders/
 ├── config/               分类清单（9 个 list_*.json，视频元数据 + 播放地址）
 ├── src/                 共享库
 │   ├── douyin_api.py      抖音接口封装（取直链 / 读登录态）
-│   └── douyin_sign.py     抖音签名
-├── output/douyin/storage_state.json   抖音登录态（勿提交，运行时用）
+│   ├── douyin_sign.py     抖音签名
+│   └── paths.py           路径唯一来源（所有脚本都从这里取目录，改输出位置只动它）
+├── docs/                 项目文档（CHANGELOG.md 改动思路 / 日志/ 每日记录）
+├── output/
+│   ├── 文案/<分类>/<序号>_标题.md   MD 成品 —— 入库
+│   ├── douyin/storage_state.json    抖音登录态 —— 忽略（含凭证）
+│   ├── _temp_audio/                 下载的音视频 —— 忽略
+│   ├── _tr/ _trash/                 中间产物与回收站 —— 忽略
 ├── requirements.txt       依赖：requests, av
 └── README.md
 ```
 
-输出：`spiders` 的同级目录 `抖音收藏文案整理/<分类>/<序号>_标题.md`
+输出：`spiders/output/文案/<分类>/<序号>_标题.md`（**在仓库内，随代码一起提交**）
 
 ## 环境准备
 
@@ -42,11 +48,15 @@ spiders/
    用飞书 App 扫码确认。飞书开放平台后台需给该应用开通
    `drive`（`drive:drive` / `drive:file` / `drive:file:upload`）与 `minutes` 权限并发布。
 4. 路径：脚本会自动以「项目根（spiders 目录）」定位 `config/`、`src/`、`output/`，
-   输出目录默认为根目录的同级 `抖音收藏文案整理`。换机器用环境变量覆盖：
+   输出成品默认落在仓库内 `output/文案/`，中间产物在 `output/_temp_audio/`。
+   所有路径集中定义在 `src/paths.py`，换机器用环境变量覆盖：
    ```
-   set DOUYIN_BASE=X:/path/to/spiders
-   set DOUYIN_OUT=X:/path/to/抖音收藏文案整理
+   set DOUYIN_BASE=X:/path/to/spiders           :: 仓库根
+   set DOUYIN_OUT=X:/path/to/spiders/output/文案   :: MD 成品目录
+   set DOUYIN_MEDIA=X:/path/to/spiders/output      :: 中间产物根目录
    ```
+   > 注意 `.gitignore` 是「忽略 output/*，但放行 output/文案/」。
+   > 如果把成品目录改到 output 之外，记得同步改忽略规则，否则 MD 提交不上去。
    子进程解释器与 lark-cli 会自动探测，必要时用环境变量指定：
    ```
    set DOUYIN_PYTHON=X:/path/to/python.exe     :: 跑 fetch/transcribe 用的解释器

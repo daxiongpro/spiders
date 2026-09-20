@@ -4,6 +4,40 @@
 
 ---
 
+## 2026-09-20 · MD 成品移入仓库 + 路径统一
+
+### 改了什么
+
+1. 762 篇 MD 从桌面 `抖音收藏文案整理/` 搬入仓库 `spiders/output/文案/`，全部入库。
+2. 新增 `src/paths.py`，作为路径的唯一来源。
+3. 6 个脚本（fetch_only / lark_transcribe / status / cleanup / run_pipeline / progress_dashboard）全部改为从 `paths.py` 取目录，不再各自拼接。
+4. `lark_transcribe.py` 里 lark-cli 的 `cwd` 由 `OUT_CAT` 改为 `MEDIA_ROOT`。
+5. `.gitignore`：由整条忽略 `output/` 改为 `output/*` + `!output/文案/`，再单独列出 `output/douyin/`、`output/_temp_audio/`、`output/_tr/`、`output/_trash/`。
+6. `cleanup.py`：清理扫描目标改到 `MEDIA_ROOT`；遗留文件扫描从只认 `*.mp4` 扩展到 `mp3/m4a/m4s`。
+
+### 为什么
+
+- **成品在仓库外**：原本输出根目录是 `spiders` 的**同级兄弟目录**（桌面上的 `抖音收藏文案整理`），完全不受版本管理，换电脑等于白干一次。
+- **忽略规则冲突**：`.gitignore` 原本整条忽略 `output/`（当初为了挡 `storage_state.json` 凭证）。所以单纯的"把 MD 挪进 output/"是不够的——挪进去照样提交不了。必须改成精确放行 `output/文案/`，同时继续挡住凭证和几十 MB 音视频。
+- **路径写死在 6 个地方**：同一个默认值 `dirname(BASE)/"抖音收藏文案整理"` 被复制了 6 份。改输出位置要同步 6 处，漏一个就会静默写回桌面且很难发现。收敛成一个模块是治本。
+- **lark-cli 的 cwd 必须改**：它只把中间产物写到"当前工作目录"。原来 cwd 就是输出根目录，同时也是 MD 成品目录；迁移后若继续用 `OUT_CAT`，lark-cli 会把临时文件直接写进 `文案/`，污染成品目录。
+- **cleanup 漏扫**：抽音频阶段会留下 `mp3`/`m4a`，而脚本只扫 `*.mp4`。这正是桌面 `_temp_audio` 里 37 个 mp3（51.8MB）常年没被回收的原因——它们对应的 MD 全都已生成，本该被清掉。
+
+### 验证
+
+- 搬迁前后 MD 总数均为 762，9 个分类逐个核对无误。
+- `src/paths.py` 直接运行，7 条路径全部落在仓库内。
+- `status.py` 跑通：`OUT_CAT` 指向新目录，9 个分类全部满贯 762/762，MD 成品 2.3MB。
+- 6 个脚本全部 `py_compile` 通过。
+- `git check-ignore` 确认 `output/文案/…md` 未被忽略；`git status -uall` 统计到 763 个待新增（762 MD + paths.py）。
+
+### 已知遗留
+
+- 桌面 `抖音收藏文案整理/_temp_audio/` 还留着 37 个 mp3 + `probe_meta.json`（51.8MB），**等待用户确认是否删除**。已核对其对应 MD 全部已生成，属于可安全回收的残留。
+- `storage_state.json` 登录态仍失效（403），流水线暂时跑不动。
+
+---
+
 ## 2026-09-20 · 文档体系与版本管理
 
 ### 改了什么
