@@ -4,6 +4,26 @@
 
 ---
 
+## 2026-09-20 · 文档体系与版本管理
+
+### 改了什么
+
+1. 新建 `docs/`：把 `.workbuddy/memory/` 下的历史日志迁到 `docs/日志/`，新增 `docs/README.md`（目录约定）与本文件。
+2. 新建分支 `douyin-v2`（基于 `douyin`）并提交上述全部改动，未推送远端。
+3. 清理临时文件：5 个调试探针产物 + `src/__pycache__`，已移到 `C:\Users\Administrator\AppData\Local\Temp\spiders_trash_2026-09-20`。
+
+### 为什么
+
+- 工作记忆原本写在 `.workbuddy/`，属于本机私有目录，既不该进 Git 也不可追溯。改成 `docs/` 后，改动思路随代码一起版本化，换机器/回看历史都能查到。
+- 分支用 `douyin-v2` 而不是继续在 `douyin` 上提交，是为了把「可移植性改造」和原版分开，出问题好回滚。
+
+### 验证
+
+- `git status` 干净；`git ls-tree HEAD` 确认 33 个文件已入库，不含 `.workbuddy/`、不含 `output/`。
+- 确认 `output/` 与 `__pycache__` 从未进入过版本库，登录态凭证无泄露风险。
+
+---
+
 ## 2026-09-20 · 可移植性修复 + 分类自动发现
 
 ### 改了什么
