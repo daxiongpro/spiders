@@ -12,7 +12,15 @@ output/
 # 运行期本地状态（脚本生成的临时文件）
 _status.txt
 _realtime.json
+_realtime.json.tmp
 _pipeline.log
 _lark_qr.png
+
+# 一次性探针/调试产物（用完即删，勿入库）
+/_probe*
+/_check*
+
+# WorkBuddy 本地工作记忆（不入库，正式内容放 docs/）
+.workbuddy/
 
 # 说明：config/ 下的 list_*.json 是输入数据，需纳入版本管理，不要忽略。

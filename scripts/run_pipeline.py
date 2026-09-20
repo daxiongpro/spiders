@@ -5,18 +5,52 @@
 供 progress_dashboard 展示。转写失败的自动打【转写失败】标记存档。
 遇到授权失效自动停止（PIPELINE_HALT_AUTH），重授权后重跑即可（幂等）。
 """
-import os, re, sys, json, glob, time, subprocess, threading
+import glob, json, os, re, shutil, subprocess, sys, threading, time
 
 SP  = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # 项目根 spiders
 OUT = os.environ.get("DOUYIN_OUT") or os.path.join(
     os.path.dirname(SP), "抖音收藏文案整理")
 TA  = os.path.join(OUT, "_temp_audio")
-PY  = r"C:/ProgramData/miniforge3/python.exe"
+
+
+def find_python():
+    """优先环境变量 → 当前解释器 → 常见安装路径，避免写死某台机器的绝对路径。
+
+    想把 fork/转写固定到某个已装依赖的解释器时用：
+        set DOUYIN_PYTHON=X:/path/to/python.exe
+    """
+    cands = [os.environ.get("DOUYIN_PYTHON"), sys.executable,
+             shutil.which("python"), shutil.which("python3"),
+             r"C:/ProgramData/miniforge3/python.exe"]
+    for c in cands:
+        if c and (os.path.isfile(c) or shutil.which(c)):
+            return c
+    return sys.executable
+
+
+PY  = find_python()
 FETCH = os.path.join(SP, "scripts", "fetch_only.py")
 TRANS = os.path.join(SP, "scripts", "lark_transcribe.py")
 
-ORDER = ["未分类", "探店·吃喝", "家庭·婚姻", "生活·出行", "娱乐·休闲"]
+# 分类处理顺序：先跑优先列表，剩余分类按 config/list_*.json 自动补齐，
+# 免得以后新增了分类清单却忘了在这里登记。
+PREFERRED_ORDER = ["未分类", "探店·吃喝", "家庭·婚姻", "生活·出行", "娱乐·休闲"]
 CHUNK = 20
+
+
+def discover_order():
+    """扫描 config/list_*.json 得到全部分类，优先列表内的排在前面。"""
+    found = []
+    for jf in sorted(glob.glob(os.path.join(SP, "config", "list_*.json"))):
+        cat = os.path.basename(jf)[len("list_"):-len(".json")].replace("_", "\u00b7")
+        if cat not in found:
+            found.append(cat)
+    order = [c for c in PREFERRED_ORDER if c in found]
+    order += [c for c in found if c not in order]
+    return order
+
+
+ORDER = discover_order()
 MAX_ITER = 40
 LOG = os.path.join(SP, "_pipeline.log")
 RT  = os.path.join(SP, "_realtime.json")
@@ -77,8 +111,9 @@ def mark_fail(seq, cat, reason):
     p = os.path.join(catdir, fn)
     if os.path.exists(p):
         return
-    c = ("# %s（转写失败）\n\n- 分类：%s\n- 序号：%d\n- 状态：转写失败\n- 原因：%s\n- 处理时间：2026-09-17\n\n"
-         "## 逐字稿\n\n> 转写失败，无可用口播文本。\n") % (t, cat, seq, reason)
+    c = ("# %s（转写失败）\n\n- 分类：%s\n- 序号：%d\n- 状态：转写失败\n- 原因：%s\n- 处理时间：%s\n\n"
+         "## 逐字稿\n\n> 转写失败，无可用口播文本。\n") % (
+        t, cat, seq, reason, time.strftime("%Y-%m-%d"))
     open(p, "w", encoding="utf-8").write(c)
 
 def compute_fetch_plan(cat, limit):

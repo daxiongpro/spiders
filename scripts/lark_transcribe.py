@@ -31,8 +31,10 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 # 换电脑时可用环境变量 DOUYIN_LARK 直接指定 lark-cli.exe 的完整路径
 LARK_CANDIDATES = [
     os.environ.get("DOUYIN_LARK") or "",
-    r"C:\Users\Administrator\.trae-cn\plugins\trae-remote-official\lark\1.0.5\bin\lark-cli.exe",
+    shutil.which("lark-cli") or "",
+    shutil.which("lark-cli.exe") or "",
     r"C:\Users\Administrator\.workbuddy\binaries\node\cli-connector-packages\node_modules\@larksuite\cli\bin\lark-cli.exe",
+    r"C:\Users\Administrator\.trae-cn\plugins\trae-remote-official\lark\1.0.5\bin\lark-cli.exe",
 ]
 LARK = ""
 for _c in LARK_CANDIDATES:

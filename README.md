@@ -47,6 +47,11 @@ spiders/
    set DOUYIN_BASE=X:/path/to/spiders
    set DOUYIN_OUT=X:/path/to/抖音收藏文案整理
    ```
+   子进程解释器与 lark-cli 会自动探测，必要时用环境变量指定：
+   ```
+   set DOUYIN_PYTHON=X:/path/to/python.exe     :: 跑 fetch/transcribe 用的解释器
+   set DOUYIN_LARK=X:/path/to/lark-cli.exe     :: 飞书 CLI
+   ```
 
 ## 用法
 
@@ -55,7 +60,7 @@ spiders/
 - 查看进度：`python -u scripts/status.py [--detail]`
 - 单分类手动跑：先 `python -u scripts/fetch_only.py --category 探店·吃喝`，再 `python -u scripts/lark_transcribe.py`
 - 一键按序跑完（推荐）：`python -u scripts/run_pipeline.py`
-  自动按 未分类 → 探店·吃喝 → 家庭·婚姻 → 生活·出行 → 娱乐·休闲 顺序，
+  分类顺序取自 `config/list_*.json`（优先名单在前，其余自动补齐，新增分类无需改代码），
   分块下载+转写，转写失败自动标记存档，断点续传（已处理的幂等跳过）。
 - 进度看板：`python -u scripts/progress_dashboard.py`，浏览器开 `http://localhost:8137`
 - 清理中间产物：`python -u scripts/cleanup.py`（预览）/ `python -u scripts/cleanup.py --do`（执行）
