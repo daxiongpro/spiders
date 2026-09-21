@@ -16,6 +16,10 @@ spiders/
 │   ├── progress_dashboard.py  本地进度看板（http://localhost:8137）
 │   └── cleanup.py             清理中间产物（不动 MD 成品）
 ├── config/               分类清单（9 个 list_*.json，视频元数据 + 播放地址）
+├── data/                 源数据台账
+│   └── 抖音收藏台账_762条.xlsx   收藏总台账 —— 入库
+│       7 列 762 行：序号 / 原文件夹 / 新分类 / 标题 / 点赞数 / 链接 / 相关主题备注
+│       全项目索引 —— 抖音接口挂掉时，清单侧数据（链接、标题原文）不会丢
 ├── src/                 共享库
 │   ├── douyin_api.py      抖音接口封装（取直链 / 读登录态）
 │   ├── douyin_sign.py     抖音签名
