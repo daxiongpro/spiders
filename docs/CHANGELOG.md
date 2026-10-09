@@ -4,6 +4,51 @@
 
 ---
 
+## 2026-10-09（晚）· 新增 step2 收藏夹视频下载脚本（增量、断点续传）
+
+### 改了什么
+1. 新增 `scripts/step2_download_folder.py`：给定一个收藏夹分类名，把这个夹里的视频**全部下载到本地**。
+   访问层沿用 step1 —— 真浏览器（系统 Edge，`headless=False`）+ 持久化配置档，
+   接口调用全在页面上下文里 `fetch`（`/collects/list/`、`/collects/video/list/`、`/aweme/detail/`），
+   签名交给页面自身生成。
+2. 新增 `scripts/step2_download_folder.bat`：双击即跑（`chcp 65001` + miniforge3 解释器回退 `python`）。
+3. `src/paths.py`：新增 `downloads_dir(folder="")`，视频根目录 = `<repo>/output/downloads`，
+   支持 `DOUYIN_DOWNLOADS` 覆盖；同步更新模块 docstring 与自检输出。
+4. `.gitignore` 显式忽略 `output/downloads/`（原本被 `output/*` 覆盖，写出来是为了让人一眼看到）。
+
+### 为什么
+- **step1 只解决了「登录」，还没有任何脚本能真正把视频落盘**。纯 HTTP 方案已报废（403 `ArgusSecurityPlugin`），
+  所以下载也只能走浏览器：`ctx.request.get` 复用页面 cookie 直连 CDN，不用另造一套请求头。
+- **增量下载做成了「以 aweme_id 为主键」，不是「看文件名在不在」**。原因：
+  - 收藏夹新增视频会让序号整体位移 → 文件名不稳定，按文件名判重会误判、重复下载；
+  - 上次下到一半中断时文件是存在的（半截）→ 只看存在会把坏文件当成品；
+  - 因此 manifest 记 `aweme_id → 文件名`，判定要过三关：**文件存在 + 大于 10KB + 文件头带 `ftyp`**
+    （第三关专门防「把 403 的 HTML 错误页存成 mp4」），远端声明了大小再对一下是否小于 95%。
+  - 记录在但文件缺失/损坏 → **移入 `output/_trash/downloads/`（带时间戳后缀）** 后重下，
+    不留坏文件冒充成品。沿用项目约定：脚本内不做任何删除动作，只往回收站目录移。
+- **每条下载完立刻写 manifest**（json + csv），所以任何时候 Ctrl+C 都不会丢进度。
+- 先写 `.part` 临时文件再 `os.replace` 改名，避免中断留下的半截文件被当成成品。
+- 图集（`images` 非空）不是视频，单独标 `image` 状态跳过，不污染失败统计。
+- 顺带修一个潜在坑：`douyin_sign` 参数构造不可用时退回内置默认值（与 step1 同款兜底），
+  保证脚本不会因为签名模块变动而整体不可用。
+
+### 用法
+```
+python -u scripts\step2_download_folder.py --list                    # 看有哪些收藏夹
+python -u scripts\step2_download_folder.py --check --folder 搞钱      # 只比对本地，缺哪些
+python -u scripts\step2_download_folder.py --folder 搞钱·事业          # 下这个夹的全部视频
+python -u scripts\step2_download_folder.py --folder 搞钱 --limit 5     # 先试 5 条
+```
+输出：`output/downloads/<收藏夹名>/<序号>_<标题>.mp4` + `_manifest.{json,csv}` + `_下载报告.txt`。
+
+### 验证
+- `py_compile` 通过（`step2_download_folder.py`、`paths.py`）；`paths.py` 自检打印出
+  `downloads_dir` = `<repo>/output/downloads` 与示例子目录。
+- `--help` 参数表正常。
+- **未做真机下载验证**（需要用户先扫码登录并自行运行），首次运行建议先 `--list` → `--check` → `--limit 5`。
+
+---
+
 ## 2026-10-09（晚）· 新增 step1 扫码登录脚本（访问层改走真浏览器）
 
 ### 改了什么

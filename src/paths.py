@@ -10,6 +10,7 @@
     spiders/
     ├─ output/
     │  ├─ 文案/<分类>/<序号>_标题.md    MD 成品 —— 入库
+    │  ├─ downloads/<收藏夹名>/        下载的原始视频 —— 忽略
     │  ├─ douyin/storage_state.json    登录态凭证 —— 忽略
     │  ├─ douyin/edge_profile/         浏览器配置档（登录态持久化，扫码一次） —— 忽略
     │  ├─ douyin/webid.txt             webid（登录时抓取） —— 忽略
@@ -19,9 +20,10 @@
 
 环境变量覆盖（换机器，或想把成品放到别处时用）：
 
-    DOUYIN_BASE    仓库根，默认本文件的上级目录
-    DOUYIN_OUT     MD 成品目录，默认 <repo>/output/文案
-    DOUYIN_MEDIA   中间产物根目录，默认 <repo>/output
+    DOUYIN_BASE       仓库根，默认本文件的上级目录
+    DOUYIN_OUT        MD 成品目录，默认 <repo>/output/文案
+    DOUYIN_MEDIA      中间产物根目录，默认 <repo>/output
+    DOUYIN_DOWNLOADS  视频下载根目录，默认 <repo>/output/downloads
 """
 import os
 
@@ -68,6 +70,17 @@ def douyin_dir() -> str:
     return os.path.join(media_root(), "douyin")
 
 
+def downloads_dir(folder: str = "") -> str:
+    """下载的原始视频目录，如 <repo>/output/downloads[/<收藏夹名>]。
+
+    传 folder 得到该收藏夹的子目录，不传则是下载根目录。
+    收藏夹名是用户数据，可能含空格/中文/斜杠，交给调用方先做一次
+    文件名清洗（脚本里的 safe_name），这里只负责拼路径。
+    """
+    root = os.environ.get("DOUYIN_DOWNLOADS") or os.path.join(media_root(), "downloads")
+    return os.path.join(root, folder) if folder else root
+
+
 def storage_state() -> str:
     """抖音登录态文件（含 Cookie 凭证，切勿提交）。"""
     return os.path.join(douyin_dir(), "storage_state.json")
@@ -96,5 +109,7 @@ if __name__ == "__main__":
                       ("media_root", media_root()), ("temp_audio", temp_audio()),
                       ("work_root", work_root()), ("trash_dir", trash_dir()),
                       ("douyin_dir", douyin_dir()), ("storage_state", storage_state()),
-                      ("browser_profile", browser_profile()), ("webid_file", webid_file())):
+                      ("browser_profile", browser_profile()), ("webid_file", webid_file()),
+                      ("downloads_dir", downloads_dir()),
+                      ("downloads_dir(示例)", downloads_dir("搞钱·事业"))):
         print("%-16s %s" % (name, val))

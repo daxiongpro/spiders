@@ -9,7 +9,9 @@
 ```
 spiders/
 ├── scripts/               入口脚本（均位于此，统一从这里运行）
-│   ├── fetch_only.py          下载视频（抖音接口取直链 → 下载 MP4 到 _temp_audio）
+│   ├── step1_login.py         扫码登录抖音（登录态持久化，只需一次）
+│   ├── step2_download_folder.py  下载某个收藏夹分类的全部视频到本地（增量）
+│   ├── fetch_only.py          下载视频（旧的纯 HTTP 版，接口已失效，保留备查）
 │   ├── lark_transcribe.py     飞书妙记转写（MP4 → 逐字稿 MD）
 │   ├── status.py              进度查看（自检 + 各分类统计）
 │   ├── run_pipeline.py        按分类自动流水线（下载+转写，断点续传）
@@ -27,6 +29,7 @@ spiders/
 ├── docs/                 项目文档（CHANGELOG.md 改动思路 / 日志/ 每日记录）
 ├── output/
 │   ├── 文案/<分类>/<序号>_标题.md   MD 成品 —— 入库
+│   ├── downloads/<收藏夹名>/       下载的原始视频 + 清单 —— 忽略
 │   ├── douyin/storage_state.json    抖音登录态 —— 忽略（含凭证）
 │   ├── _temp_audio/                 下载的音视频 —— 忽略
 │   ├── _tr/ _trash/                 中间产物与回收站 —— 忽略
@@ -58,6 +61,7 @@ spiders/
    set DOUYIN_BASE=X:/path/to/spiders           :: 仓库根
    set DOUYIN_OUT=X:/path/to/spiders/output/文案   :: MD 成品目录
    set DOUYIN_MEDIA=X:/path/to/spiders/output      :: 中间产物根目录
+   set DOUYIN_DOWNLOADS=X:/path/to/videos          :: 视频下载根目录（默认 output/downloads）
    ```
    > 注意 `.gitignore` 是「忽略 output/*，但放行 output/文案/」。
    > 如果把成品目录改到 output 之外，记得同步改忽略规则，否则 MD 提交不上去。
@@ -69,18 +73,51 @@ spiders/
 
 ## 用法
 
-所有命令都在 `scripts/` 目录下运行（或带路径调用）：
+`scripts/` 下有两个**入口脚本**，按顺序跑（**必须用 base 环境**：`C:\ProgramData\miniforge3\python.exe`，
+只有它装了 playwright + requests + av）：
+
+### 入口 1 · 登录（只需一次）
+
+```
+python -u scripts/step1_login.py
+```
+弹出 Edge → 扫抖音二维码 → 登录态存进 `output/douyin/edge_profile`，之后长期免扫。
+参数：`--reset`（换账号）/ `--timeout N` / `--keep-open`。也可直接双击 `scripts/step1_login.bat`。
+
+### 入口 2 · 下载一个收藏夹分类的全部视频
+
+```
+python -u scripts/step2_download_folder.py --list                     # ① 看有哪些收藏夹
+python -u scripts/step2_download_folder.py --check --folder 搞钱       # ② 只比对本地，看缺哪些
+python -u scripts/step2_download_folder.py --folder 搞钱·事业           # ③ 下载（会跳过已下过的）
+python -u scripts/step2_download_folder.py --folder 搞钱 --limit 5      # 先小样本试 5 条
+```
+不带参数运行会**交互式列出收藏夹让你选**；也可直接双击 `scripts/step2_download_folder.bat`。
+
+**增量下载，重复运行很安全**：判定「已下过」看的是 `aweme_id` 而不是文件名，
+且要同时满足「文件存在 + 大于 10KB + 文件头带 `ftyp`」才算数。所以收藏夹新增视频只下新增的、
+上次中断的会自动补、误删的会自动重下、收藏夹顺序变了也不会重复下载。
+
+输出 `output/downloads/<收藏夹名>/`：`<序号>_<标题>.mp4` + `_manifest.csv`（逐条状态，Excel 可开）+
+`_下载报告.txt`。常用参数：`--overwrite`（强制重下）/ `--delay`（限速）/ `--keep-open`。
+
+### 3 · 转写与其它
 
 - 查看进度：`python -u scripts/status.py [--detail]`
-- 单分类手动跑：先 `python -u scripts/fetch_only.py --category 探店·吃喝`，再 `python -u scripts/lark_transcribe.py`
 - 一键按序跑完（推荐）：`python -u scripts/run_pipeline.py`
   分类顺序取自 `config/list_*.json`（优先名单在前，其余自动补齐，新增分类无需改代码），
   分块下载+转写，转写失败自动标记存档，断点续传（已处理的幂等跳过）。
 - 进度看板：`python -u scripts/progress_dashboard.py`，浏览器开 `http://localhost:8137`
 - 清理中间产物：`python -u scripts/cleanup.py`（预览）/ `python -u scripts/cleanup.py --do`（执行）
 
+> `fetch_only.py` 是早期的纯 HTTP 下载脚本，抖音已把需登录接口升级到
+> `ArgusSecurityPlugin` 风控，它现在会 403，**已被 step2 取代**，保留仅供备查。
+
 ## 备注
 
 - 代理会阻断抖音，脚本已自动清除 `http(s)_proxy` 环境变量。
+- step1 / step2 **必须有窗口 + 用系统已装的 Edge**（`channel="msedge"`，零下载）：
+  无头会被抖音识别并落到验证码中间页。
+- 视频下载根目录默认 `output/downloads`，可用 `set DOUYIN_DOWNLOADS=X:/path` 改到别处（如移动硬盘）。
 - 转写失败的视频会生成 `<序号>_【转写失败】标题.md` 占位，不再重复重试。
 - 抖音 / 飞书令牌失效时流水线会停止并写 `PIPELINE_HALT_AUTH`，重授权后重跑即可。

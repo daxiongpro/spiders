@@ -15,6 +15,7 @@ output/*
 # 抖音登录态（含 Cookie 凭证，切勿提交）
 output/douyin/
 # 下载的音视频与中间产物
+output/downloads/
 output/_temp_audio/
 output/_tr/
 output/_trash/
