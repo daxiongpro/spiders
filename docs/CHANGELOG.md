@@ -4,6 +4,41 @@
 
 ---
 
+## 2026-10-09（深夜）· 修 step2 致命 bug：抖音 19 位 id 被 JS 抹掉末位
+
+### 改了什么
+1. `scripts/step2_download_folder.py` 的三个注入 JS（`JS_COLLECTS` / `JS_VIDEOS` / `JS_DETAIL`）
+   各加一行 `bigintSafe()`：**在 `JSON.parse` 之前**给「字段名含 id 且值为 15 位以上数字」的大数字加引号，
+   让它们保持字符串形态：
+   `t.replace(/"(\w*[iI]d\w*)":\s*(\d{15,})/g, '"$1":"$2"')`
+2. `collects_id` 取值顺序由 `collects_id || collects_id_str` 改为 **`collects_id_str || collects_id`**；
+   `aweme_id` 同样改为优先 `aweme_id_str`（与第 1 条互为正交保险）。
+3. 在 `JS_COLLECTS` 上方写了注释，说明这个坑，以及「不能只按 `:数字` 的位置乱替换」（会破坏 JSON）。
+
+### 为什么（实测，不是推测）
+- 第一次真跑 `--list` 就发现收藏夹 id 结尾全成了 `000`：`7683514130774383000`。
+  抖音的 `aweme_id` / `collects_id` 都是 **19 位**数字，超过 JS 的
+  `Number.MAX_SAFE_INTEGER`（9007199254740991，16 位），`JSON.parse` 一律把末几位抹零。
+- **`aweme_id` 是本脚本增量下载的主键**，id 一错 → 与远端永远对不上 → 每次运行都全量重下，
+  按 id 请求 `/aweme/detail/` 也必然失败。**不修的话「增量」这个核心功能等于不存在。**
+- 实测 `aweme_id_str` 字段**根本不存在**（返回空串），所以不能靠 `*_str` 兜底，只能在解析阶段预处理；
+  `collects_id_str` 则确实存在，两处都改是双保险。
+- 顺带排除一个被误导的方向（已写进注释，省得后人再踩）：`/collects/video/list/` **没有失效** ——
+  分页正常、返回真实 CDN 直链；而 `/mix/aweme/`（拿 collects_id 当 mix_id）返回 `status_code=4`，
+  收藏夹不是「合集」，此路不通。真正的病根只有一个：**id 精度**。
+
+### 真机验证（douyin 环境：`C:\ProgramData\miniforge3\envs\douyin\python.exe`）
+| 项 | 结果 |
+|---|---|
+| 收藏夹 id | `7683510189210949416`（19 位完整）✅ |
+| `--check --folder 搞钱` 分页 | 5 页 20+20+20+19+7 = **86 条**（接口报 87，1 条已下架）✅ |
+| `--limit 1` 真实下载 | 6,289,424 B，耗时 2 秒 ✅ |
+| MP4 文件头 | `ftypisom....isomiso2avc1mp41` ✅ |
+| manifest 的 aweme_id | 19 位完整，与列表一致 ✅ |
+| 第二次运行 | 「已下载过，跳过」，本次新下载 0 ✅ |
+
+---
+
 ## 2026-10-09（晚）· 新增 step2 收藏夹视频下载脚本（增量、断点续传）
 
 ### 改了什么

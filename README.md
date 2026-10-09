@@ -73,26 +73,42 @@ spiders/
 
 ## 用法
 
-`scripts/` 下有两个**入口脚本**，按顺序跑（**必须用 base 环境**：`C:\ProgramData\miniforge3\python.exe`，
-只有它装了 playwright + requests + av）：
+`scripts/` 下有两个**入口脚本**，按顺序跑。
+
+> ⚠️ **Windows 上不要直接敲脚本名**（如 `scripts\step2_download_folder.py`）。
+> 本机 `.py` **没有文件关联**、`py.exe` 不存在、`PATHEXT` 里也没有 `.PY`，
+> 所以 PowerShell 会**静默不执行**——不报错、零输出，看起来像脚本没反应。
+> 要么双击 `.bat`，要么把解释器写全（见下面的例子）。
+
+解释器统一用 **base 环境** `C:\ProgramData\miniforge3\python.exe`：项目其它脚本依赖的
+`av` / `requests` 只装在这里。具名环境（如 `douyin`）虽然也有 playwright，但**别混用**，
+免得出现「A 脚本能跑、B 脚本报缺包」。下面命令都写全路径，复制即可，不受当前激活环境影响。
 
 ### 入口 1 · 登录（只需一次）
 
 ```
-python -u scripts/step1_login.py
+C:\ProgramData\miniforge3\python.exe -u scripts\step1_login.py
 ```
 弹出 Edge → 扫抖音二维码 → 登录态存进 `output/douyin/edge_profile`，之后长期免扫。
-参数：`--reset`（换账号）/ `--timeout N` / `--keep-open`。也可直接双击 `scripts/step1_login.bat`。
+参数：`--reset`（换账号）/ `--timeout N` / `--keep-open`。也可直接双击 `scripts\step1_login.bat`。
 
 ### 入口 2 · 下载一个收藏夹分类的全部视频
 
 ```
-python -u scripts/step2_download_folder.py --list                     # ① 看有哪些收藏夹
-python -u scripts/step2_download_folder.py --check --folder 搞钱       # ② 只比对本地，看缺哪些
-python -u scripts/step2_download_folder.py --folder 搞钱·事业           # ③ 下载（会跳过已下过的）
-python -u scripts/step2_download_folder.py --folder 搞钱 --limit 5      # 先小样本试 5 条
+C:\ProgramData\miniforge3\python.exe -u scripts\step2_download_folder.py --list                  # ① 看有哪些收藏夹
+C:\ProgramData\miniforge3\python.exe -u scripts\step2_download_folder.py --check --folder 搞钱    # ② 只比对本地，看缺哪些
+C:\ProgramData\miniforge3\python.exe -u scripts\step2_download_folder.py --folder 搞钱·事业        # ③ 下载（会跳过已下过的）
+C:\ProgramData\miniforge3\python.exe -u scripts\step2_download_folder.py --folder 搞钱 --limit 5   # 先小样本试 5 条
 ```
-不带参数运行会**交互式列出收藏夹让你选**；也可直接双击 `scripts/step2_download_folder.bat`。
+不带参数运行会**交互式列出收藏夹让你选**。
+
+**最不容易出错的跑法**是走 `.bat`（它内部写死了 base 解释器，不受当前 conda 环境影响，
+且 `.bat` 在 `PATHEXT` 里，PowerShell 能直接执行）：
+```
+scripts\step2_download_folder.bat                  # 双击或直接敲，交互式选收藏夹
+scripts\step2_download_folder.bat --list           # 也支持带参数，等价于上面的长命令
+scripts\step2_download_folder.bat --check --folder 搞钱
+```
 
 **增量下载，重复运行很安全**：判定「已下过」看的是 `aweme_id` 而不是文件名，
 且要同时满足「文件存在 + 大于 10KB + 文件头带 `ftyp`」才算数。所以收藏夹新增视频只下新增的、

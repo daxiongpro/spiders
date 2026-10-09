@@ -102,19 +102,29 @@ DOWNLOAD_RETRIES = 2
 _BAD_CHARS = re.compile(r'[\\/:*?"<>|\x00-\x1f]')
 _WS = re.compile(r"\s+")
 
+# ⚠️ 抖音的 id（aweme_id / collects_id）是 19 位数字，超过 JS 的 Number.MAX_SAFE_INTEGER
+# （9007199254740991，16 位）。直接 JSON.parse 会把末几位抹成 0 —— 实测
+# 7683514130774382336 变成 7683514130774383000。用 aweme_id 当增量下载主键时，
+# 这会导致「本地记录的 id」和「远端真实 id」永远对不上 → 每次都重复下载、
+# 且按 id 生成的详情请求全部失败。所以三个 JS 里都必须先做 bigintSafe 预处理。
+# 注意：替换必须限定「字段名含 id」（用 /"(\w*id\w*)":\s*(\d{15,})/），
+# 不能只按 `:数字` 的位置乱替换 —— 那样会命中字符串内部的内容，直接破坏 JSON（踩过：
+# `"free_product_info":{"product_id":768…}` 这类会被改坏，报 "Expected ',' or '}'"）。
+#
 # 收藏夹列表：只把需要的字段带出页面，避免把整个响应体搬到 Python 侧
 JS_COLLECTS = """async (url) => {
+    const bigintSafe = t => t.replace(/"([A-Za-z_]*[iI]d[A-Za-z_]*)":\\s*(\\d{15,})/g, '"$1":"$2"');
     try {
         const res = await fetch(url, {credentials: 'include'});
         const txt = await res.text();
         if (res.status !== 200) return {status: res.status, body: txt.slice(0, 800)};
         let d;
-        try { d = JSON.parse(txt); } catch (e) { return {status: -2, body: txt.slice(0, 800)}; }
+        try { d = JSON.parse(bigintSafe(txt)); } catch (e) { return {status: -2, body: txt.slice(0, 800)}; }
         const raw = d.collects_list || [];
         const list = raw.map(it => {
             const c = (it && it.collects_info) ? it.collects_info : (it || {});
             return {
-                id: String(c.collects_id || c.collects_id_str || ''),
+                id: String(c.collects_id_str || c.collects_id || ''),
                 name: c.collects_name || '',
                 total: Number(c.total_number || 0)
             };
@@ -130,19 +140,20 @@ JS_COLLECTS = """async (url) => {
 # 收藏夹视频列表：同样只回传下载需要的字段
 # 注意：部分响应把 aweme 包在 aweme_info 里，这里两种都兼容
 JS_VIDEOS = """async (url) => {
+    const bigintSafe = t => t.replace(/"([A-Za-z_]*[iI]d[A-Za-z_]*)":\\s*(\\d{15,})/g, '"$1":"$2"');
     try {
         const res = await fetch(url, {credentials: 'include'});
         const txt = await res.text();
         if (res.status !== 200) return {status: res.status, body: txt.slice(0, 800)};
         let d;
-        try { d = JSON.parse(txt); } catch (e) { return {status: -2, body: txt.slice(0, 800)}; }
+        try { d = JSON.parse(bigintSafe(txt)); } catch (e) { return {status: -2, body: txt.slice(0, 800)}; }
         const raw = d.aweme_list || [];
         const list = raw.map(it => {
             const a = (it && it.aweme_info) ? it.aweme_info : (it || {});
             const v = a.video || {};
             const urls = o => (o && o.url_list) ? o.url_list : [];
             return {
-                aweme_id: String(a.aweme_id || a.aweme_id_str || ''),
+                aweme_id: String(a.aweme_id_str || a.aweme_id || ''),
                 desc: a.desc || '',
                 author: (a.author && (a.author.nickname || a.author.unique_id)) || '',
                 create_time: Number(a.create_time || 0),
@@ -163,12 +174,13 @@ JS_VIDEOS = """async (url) => {
 
 # 详情接口：列表里带的直链过期时用它刷新
 JS_DETAIL = """async (url) => {
+    const bigintSafe = t => t.replace(/"([A-Za-z_]*[iI]d[A-Za-z_]*)":\\s*(\\d{15,})/g, '"$1":"$2"');
     try {
         const res = await fetch(url, {credentials: 'include'});
         const txt = await res.text();
         if (res.status !== 200) return {status: res.status, body: txt.slice(0, 800)};
         let d;
-        try { d = JSON.parse(txt); } catch (e) { return {status: -2, body: txt.slice(0, 800)}; }
+        try { d = JSON.parse(bigintSafe(txt)); } catch (e) { return {status: -2, body: txt.slice(0, 800)}; }
         const a = d.aweme_detail || d.aweme || {};
         const v = a.video || {};
         const urls = o => (o && o.url_list) ? o.url_list : [];
