@@ -11,6 +11,8 @@
     ├─ output/
     │  ├─ 文案/<分类>/<序号>_标题.md    MD 成品 —— 入库
     │  ├─ douyin/storage_state.json    登录态凭证 —— 忽略
+    │  ├─ douyin/edge_profile/         浏览器配置档（登录态持久化，扫码一次） —— 忽略
+    │  ├─ douyin/webid.txt             webid（登录时抓取） —— 忽略
     │  ├─ _temp_audio/                 下载的音视频 —— 忽略
     │  ├─ _tr/                         lark-cli 中间产物 —— 忽略
     │  └─ _trash/                      "删除"实为移入此处 —— 忽略
@@ -61,14 +63,38 @@ def trash_dir() -> str:
     return os.path.join(media_root(), "_trash")
 
 
+def douyin_dir() -> str:
+    """抖音凭证目录，如 <repo>/output/douyin（登录态、webid 都放这里）。"""
+    return os.path.join(media_root(), "douyin")
+
+
 def storage_state() -> str:
     """抖音登录态文件（含 Cookie 凭证，切勿提交）。"""
-    return os.path.join(base(), "output", "douyin", "storage_state.json")
+    return os.path.join(douyin_dir(), "storage_state.json")
+
+
+def browser_profile() -> str:
+    """扫码登录用的浏览器配置档目录。
+
+    登录态（cookie + localStorage）持久化在这里，所以只需扫码一次；
+    独立目录，不碰用户日常使用的 Edge 配置，两者互不干扰。
+    """
+    return os.path.join(douyin_dir(), "edge_profile")
+
+
+def webid_file() -> str:
+    """webid 文件（19 位数字，登录后从 localStorage 提取）。
+
+    webid 参与接口参数构造；旧代码里写死的默认值与本机真实值不一致，
+    登录时抓到真实值存下来更可靠。
+    """
+    return os.path.join(douyin_dir(), "webid.txt")
 
 
 if __name__ == "__main__":
     for name, val in (("base", base()), ("out_dir", out_dir()),
                       ("media_root", media_root()), ("temp_audio", temp_audio()),
                       ("work_root", work_root()), ("trash_dir", trash_dir()),
-                      ("storage_state", storage_state())):
-        print("%-14s %s" % (name, val))
+                      ("douyin_dir", douyin_dir()), ("storage_state", storage_state()),
+                      ("browser_profile", browser_profile()), ("webid_file", webid_file())):
+        print("%-16s %s" % (name, val))

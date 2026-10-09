@@ -4,6 +4,26 @@
 
 ---
 
+## 2026-10-09（晚）· 新增 step1 扫码登录脚本（访问层改走真浏览器）
+
+### 改了什么
+1. 新增 `scripts/step1_login.py`：弹出浏览器 → 扫抖音二维码 → 登录态持久化到本地配置档，并抓 webid、导出 storage_state，成功后顺带探测收藏夹接口。
+2. 新增 `scripts/step1_login.bat`：双击即跑（`chcp 65001` + miniforge3 解释器回退 `python`）。
+3. `src/paths.py`：新增 `douyin_dir()` / `browser_profile()` / `webid_file()`，并把 `storage_state()` 改为基于 `douyin_dir()`，消除原先写死的 `output/douyin`。
+
+### 为什么
+- **纯 HTTP 方案已实测报废**：抖音把「需登录」接口升级到 `ArgusSecurityPlugin` 风控，同一条 `/collects/list/` 纯 HTTP 是 403，在浏览器页面上下文里是 200（详见 `docs/日志/2026-10-09.md`）。所以访问层必须让真浏览器在场。
+- **必须有窗口、且用已装的 Edge**：无头模式会被抖音识别并落到「验证码中间页」（实测无 `UIFID`）；`channel="msedge"` 可直接驱动系统 Edge，**零下载**。这两条是硬约束，写进脚本头注释。
+- **配置档独立**：`output/douyin/edge_profile`，不碰用户日常 Edge 配置；扫码一次长期免扫。
+- **顺手补一个真实缺口**：旧代码 `DEFAULT_WEBID` 与本机真实 webid 不一致，脚本登录时从 localStorage 抓真实值存到 `webid.txt`。
+
+### 验证
+- `py_compile` 通过；脚本实际启动 Edge（155.0.4283.45）打开抖音首页成功（截图见 `%TEMP%\edge_headful.png`）。
+- 未登录状态下自检：脚本写出 `output/douyin/last_login.txt` = `结果：未完成登录`，退出码 1 —— 扫描逻辑与失败路径正常。
+- 未做真机扫码验证（留给用户自行运行）。
+
+---
+
 ## 2026-09-23 · 串稿修复：内容防护 + 污染隔离
 
 ### 改了什么
