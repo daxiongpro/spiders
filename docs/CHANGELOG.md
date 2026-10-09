@@ -4,6 +4,39 @@
 
 ---
 
+## 2026-10-09（深夜 3）· step2 换下载通道：流式直连 CDN（解决大视频假死）
+
+### 改了什么
+1. `scripts/step2_download_folder.py` 新增 `http_session()` / `stream_to_file()`
+   / `browser_body_to_file()`，重写 `download_video()`：
+   - 默认用 `requests` **流式直连 CDN**：cookie + UA 从浏览器上下文导出，带 `Referer`，
+     256KB 分块边下边写 `.part`，支持 `Range` 断点续传，`(15, 30)` 秒连接/读取超时。
+   - `ctx.request.get().body()` 那条路降级为兜底（没装 `requests` 或加 `--via-browser`）。
+   - 新增 `--via-browser` 参数（排障用，强制走旧路径）。
+   - 新增常量 `CDN_CONNECT_TIMEOUT` / `CDN_READ_TIMEOUT` / `STREAM_CHUNK`
+     / `BROWSER_BODY_TIMEOUT`。
+2. 验收标准与「本地已下好」统一：流式下完也走 `local_video_ok()`（够大 + `ftyp`
+   + 不小于远端声明大小的 95%）才 `os.replace` 改名。
+
+### 为什么
+用户跑 `--folder 搞钱·事业 --limit 5`，第 3 条（**217MB**）卡了 8.5 分钟没落盘，
+体检结果：python 进程 **~100% CPU**、内存 415→490MB 反复涨落、node 驱动 1.2GB，
+而目录里连 `.part` 都没有 —— 因为 `resp.body()` 是「整条读完才写盘」，
+且数据要以 base64 经 Playwright 驱动管道过一遍。
+py-spy 抓栈确认主线程整个陷在 `playwright/_impl/_transport.py:155` 的管道泵里，
+栈上没有任何应用层调用（`%TEMP%\pyspy_pkg`，py-spy 0.4.2 wheel 直接解包运行，未装进任何环境）。
+
+### 验证
+- `py_compile` 通过；`--help` 正常列出新参数。
+- **离线自测 23 项断言全过**：起本地 HTTP 服务器当假 CDN，覆盖
+  正常下载 / 404 / 200 但返回 HTML（防把错误页当视频）/ Range 206 续传 /
+  服务端不支持 Range 时重头写（不许拼坏）/ `expect_size` 不符 /
+  读超时 2 秒内放弃（把 `CDN_READ_TIMEOUT` 临时调小测的）。
+- ⚠️ **真机验证待做**：需要用户停掉当前那次运行（它占着 `edge_profile`），
+  之后用临时输出目录跑一次真实 CDN 下载，确认直链在纯 requests 下也能拉到。
+
+---
+
 ## 2026-10-09（深夜 2）· 文档：补 step2 的「python 直跑」用法
 
 ### 改了什么

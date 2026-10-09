@@ -137,6 +137,15 @@ python -u scripts\step2_download_folder.py --folder 搞钱·事业           # �
 且要同时满足「文件存在 + 大于 10KB + 文件头带 `ftyp`」才算数。所以收藏夹新增视频只下新增的、
 上次中断的会自动补、误删的会自动重下、收藏夹顺序变了也不会重复下载。
 
+**下载通道**：接口（清单/详情）必须走浏览器，但**视频本体不走**。默认用 `requests`
+流式直连 CDN —— 从浏览器上下文导出 cookie + UA，带 `Referer` 直接拉直链，
+边下边写盘、支持 Range 断点续传、30 秒收不到数据就判超时。
+
+> 为什么不用 `ctx.request.get().body()`：Playwright 会把**整个视频**当成一块 base64
+> 经驱动管道搬进 Python 内存再解码。实测一条 217MB 的视频把 python 顶到 ~100% CPU
+> 连续跑 8.5 分钟，且期间目录里连 `.part` 都看不到（看起来像卡死）。
+> 现在那条路只作兜底：没装 `requests`，或显式加 `--via-browser`。
+
 输出 `output/downloads/<收藏夹名>/`：`<序号>_<标题>.mp4` + `_manifest.csv`（逐条状态，Excel 可开）+
 `_下载报告.txt`。常用参数：`--overwrite`（强制重下）/ `--delay`（限速）/ `--keep-open`。
 

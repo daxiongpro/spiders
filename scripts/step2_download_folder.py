@@ -42,6 +42,14 @@
     1. 必须有窗口（headless=False）。无头会被抖音识别并落到「验证码中间页」。
     2. 用系统已装的 Edge（channel="msedge"）。无需下载任何浏览器。
 
+下载通道（2026-10-09 深夜改）
+    接口（清单/详情）必须走浏览器；但视频本体不必。
+    默认用 requests「流式直连 CDN」：从浏览器上下文导出 cookie + UA，带
+    Referer 直接下 CDN 直链，边下边写盘、支持 Range 续传、30 秒无数据即判超时。
+    旧的 ctx.request.get().body() 会把整个视频当一块 base64 经驱动管道搬进内存，
+    实测大视频能把 python 顶到 ~100% CPU / 数百 MB 且迟迟不落盘（像卡死），
+    现在只作为兜底（没装 requests，或显式加 --via-browser）。
+
 只用于整理本人账号自己的收藏数据，脚本内置请求间隔，不做高频采集。
 """
 import argparse
@@ -76,6 +84,11 @@ except Exception:
 
 from playwright.sync_api import sync_playwright  # noqa: E402
 
+try:  # 有 requests 就走「流式直连 CDN」；没有则退化为浏览器内存下载
+    import requests
+except ImportError:  # pragma: no cover
+    requests = None
+
 DOUYIN_HOME = "https://www.douyin.com/"
 API_PREFIX = "https://www.douyin.com/aweme/v1/web"
 PROFILE_DIR = browser_profile()
@@ -98,6 +111,15 @@ _LAUNCH_ARGS = [
 MIN_VIDEO_BYTES = 10 * 1024
 # 下载失败时重试次数（换下一个直链算一次）
 DOWNLOAD_RETRIES = 2
+
+# CDN 直连的超时（秒）。读超时的含义是「多久收不到数据就放弃」，
+# 比「整条请求总共 180 秒」更能抓住「连接挂着但一个字节都不来」的卡死。
+CDN_CONNECT_TIMEOUT = 15
+CDN_READ_TIMEOUT = 30
+# 流式写盘的分块大小
+STREAM_CHUNK = 256 * 1024
+# 浏览器兜底路径（ctx.request + body()）的单请求超时，Playwright 单位是毫秒
+BROWSER_BODY_TIMEOUT = 180000
 
 _BAD_CHARS = re.compile(r'[\\/:*?"<>|\x00-\x1f]')
 _WS = re.compile(r"\s+")
@@ -523,8 +545,130 @@ def scan_local(out_dir):
                           "stale": checked - len(state), "disk": disk}
 
 
-def download_video(ctx, page, webid, uifid, aweme, out_path):
-    """下载单个视频。返回 (status, size, note)，status ∈ ok/fail。"""
+def http_session(ctx, page):
+    """用浏览器里的 cookie + UA 造一个 requests 会话，用于流式直连 CDN。
+
+    为什么不直接用 ctx.request.get().body()：
+        Playwright 会把整个视频当成一块 base64，经驱动管道搬进 Python 内存再解码。
+        实测一条大视频能把 python 顶到 ~100% CPU / 数百 MB（node 驱动侧 1.2GB），
+        而且整条都读完才写盘 —— 期间目录里连 .part 都没有，看起来就像卡死。
+    改成 requests 流式写盘后：内存恒定、读超时是真·读超时、还能按 Range 续传。
+    """
+    s = requests.Session()
+    try:
+        ua = page.evaluate("() => navigator.userAgent") or ""
+    except Exception:  # noqa: BLE001
+        ua = ""
+    s.headers.update({
+        "Referer": DOUYIN_HOME,
+        "Accept": "*/*",
+        "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
+    })
+    if ua:
+        s.headers["User-Agent"] = ua
+    for c in ctx.cookies():
+        name, value = c.get("name"), c.get("value")
+        if not name:
+            continue
+        try:
+            s.cookies.set(name, value or "", domain=c.get("domain") or None,
+                          path=c.get("path") or "/")
+        except Exception:  # noqa: BLE001
+            pass
+    # 注意：CDN 域名（*.douyinvod.com）和 douyin.com 不同，cookie 未必带得过去。
+    # 直链本身是签过名的，通常不带 cookie 也能下；真下不动会回退到浏览器路径。
+    return s
+
+
+def stream_to_file(session, url, out_path, expect_size=0):
+    """流式把 url 写到 out_path（先 .part 再改名）。返回 (ok, size, note)。
+
+    断点续传：上次留下的 .part 会用 Range 续着下；服务端不支持就从头来。
+    """
+    tmp = out_path + ".part"
+    have = 0
+    if os.path.exists(tmp):
+        try:
+            have = os.path.getsize(tmp)
+        except OSError:
+            have = 0
+    if have <= MIN_VIDEO_BYTES:  # 太小的残片不值得续，直接重下
+        have = 0
+
+    try:
+        resp = session.get(url, headers=({"Range": "bytes=%d-" % have} if have else {}),
+                           stream=True,
+                           timeout=(CDN_CONNECT_TIMEOUT, CDN_READ_TIMEOUT))
+    except requests.RequestException as e:
+        return False, have, "请求异常 %s" % str(e).split("\n")[0]
+
+    try:
+        code = resp.status_code
+        if code == 206 and have:
+            mode = "ab"
+        elif code == 200:
+            mode, have = "wb", 0  # 服务端不给续，从头写
+        else:
+            return False, have, "HTTP %d" % code
+
+        total = have
+        try:
+            with open(tmp, mode) as f:
+                for chunk in resp.iter_content(chunk_size=STREAM_CHUNK):
+                    if not chunk:
+                        continue
+                    f.write(chunk)
+                    total += len(chunk)
+        except requests.RequestException as e:
+            return False, total, "传输中断（已存 %d 字节）：%s" % (
+                total, str(e).split("\n")[0])
+        except OSError as e:
+            return False, total, "写盘失败：%s" % e
+
+        # 用和「本地已下好」完全同一套标准验收：够大 + 带 ftyp + 不小于声明大小的 95%
+        ok, size = local_video_ok(tmp, expect_size)
+        if not ok:
+            return False, size, "下完了但校验不过（%d 字节）" % size
+        os.replace(tmp, out_path)  # 先写临时文件再改名，避免半截文件被当成品
+        return True, size, ""
+    finally:
+        try:
+            resp.close()
+        except Exception:  # noqa: BLE001
+            pass
+
+
+def browser_body_to_file(ctx, url, out_path):
+    """兜底：用浏览器上下文取直链（整个 body 先落内存）。
+
+    慢且吃内存，只在没装 requests（流式不可用）或加了 --via-browser 时用。
+    """
+    try:
+        resp = ctx.request.get(url, headers={"Referer": DOUYIN_HOME},
+                               timeout=BROWSER_BODY_TIMEOUT)
+    except Exception as e:  # noqa: BLE001
+        return False, 0, "请求异常 %s" % str(e).split("\n")[0]
+    if not resp.ok:
+        return False, 0, "HTTP %s" % resp.status
+    try:
+        data = resp.body()
+    except Exception as e:  # noqa: BLE001
+        return False, 0, "读取响应失败 %s" % str(e).split("\n")[0]
+    if not looks_like_mp4(data):
+        return False, 0, "返回内容不是视频（%d 字节）" % len(data)
+    tmp = out_path + ".part"
+    with open(tmp, "wb") as f:
+        f.write(data)
+    os.replace(tmp, out_path)
+    return True, len(data), ""
+
+
+def download_video(ctx, page, webid, uifid, aweme, out_path,
+                   session=None, expect_size=0):
+    """下载单个视频。返回 (status, size, note)，status ∈ ok/fail。
+
+    session 非空走流式直连 CDN；为空则退化为浏览器内存下载。
+    """
     urls = candidate_urls(aweme)
     if not urls:
         urls = detail_urls(page, webid, uifid, aweme["aweme_id"])
@@ -537,28 +681,13 @@ def download_video(ctx, page, webid, uifid, aweme, out_path):
             fresh = detail_urls(page, webid, uifid, aweme["aweme_id"])
             urls = fresh or urls
         for url in urls:
-            try:
-                resp = ctx.request.get(
-                    url, headers={"Referer": DOUYIN_HOME}, timeout=180000)
-            except Exception as e:  # noqa: BLE001
-                last = "请求异常 %s" % str(e).split("\n")[0]
-                continue
-            if not resp.ok:
-                last = "HTTP %s" % resp.status
-                continue
-            try:
-                data = resp.body()
-            except Exception as e:  # noqa: BLE001
-                last = "读取响应失败 %s" % str(e).split("\n")[0]
-                continue
-            if not looks_like_mp4(data):
-                last = "返回内容不是视频（%d 字节）" % len(data)
-                continue
-            tmp = out_path + ".part"
-            with open(tmp, "wb") as f:
-                f.write(data)
-            os.replace(tmp, out_path)  # 先写临时文件再改名，避免半截文件被当成品
-            return "ok", len(data), ""
+            if session is not None:
+                ok, size, note = stream_to_file(session, url, out_path, expect_size)
+            else:
+                ok, size, note = browser_body_to_file(ctx, url, out_path)
+            if ok:
+                return "ok", size, ""
+            last = note
         if attempt < DOWNLOAD_RETRIES:
             log("    下载失败（%s），刷新直链后重试…" % last)
             time.sleep(2)
@@ -667,6 +796,8 @@ def main():
     ap.add_argument("--overwrite", action="store_true", help="已存在的文件也重新下载")
     ap.add_argument("--timeout", type=int, default=180, help="等待扫码的秒数上限")
     ap.add_argument("--keep-open", action="store_true", help="结束后不自动关窗")
+    ap.add_argument("--via-browser", action="store_true",
+                    help="强制走浏览器内存下载（默认优先流式直连 CDN，排障用）")
     args = ap.parse_args()
 
     os.makedirs(PROFILE_DIR, exist_ok=True)
@@ -690,6 +821,19 @@ def main():
             if not logged:
                 log("未登录，退出。请先跑 scripts/step1_login.py")
                 return 1
+
+            # 下载通道：优先「流式直连 CDN」（省内存、有真读超时、可续传）
+            session = None
+            if args.via_browser:
+                log("按 --via-browser：本次走浏览器内存下载（大视频会很慢）")
+            elif requests is None:
+                log("未安装 requests，只能用浏览器内存下载（大视频会很慢）")
+            else:
+                try:
+                    session = http_session(ctx, page)
+                    log("下载通道：流式直连 CDN（复用浏览器 cookie + UA）")
+                except Exception as e:  # noqa: BLE001
+                    log("流式会话建立失败，回退浏览器内存下载：%s" % e)
 
             log("正在读取收藏夹列表…")
             cols = list_collections(page, webid, uifid, args.page_delay)
@@ -818,7 +962,9 @@ def main():
                         order = [x for x in order if x != aid] + [aid]
                         continue
 
-                status, size, note = download_video(ctx, page, webid, uifid, aweme, path)
+                status, size, note = download_video(
+                    ctx, page, webid, uifid, aweme, path,
+                    session=session, expect_size=aweme.get("size", 0))
                 if status == "ok":
                     ok += 1
                     log("%s → 完成（%.1f MB）" % (head, size / 1048576.0))
