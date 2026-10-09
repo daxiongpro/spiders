@@ -237,7 +237,7 @@ def main():
             if _state.get("auth_error"):
                 log("  [%s] 检测到飞书授权失效，停止流水线。" % cat)
                 log("PIPELINE_HALT_AUTH"); write_rt(); sys.exit(0)
-            run_stream([PY, "-u", TRANS, "--workers", "2"], is_transcribe=True)
+            run_stream([PY, "-u", TRANS, "--workers", "1"], is_transcribe=True)
             for seq_s, item in list(_state["transcribe_items"].items()):
                 if item["status"] == "fail":
                     mark_fail(int(seq_s), cat, "飞书妙记转写失败（详见 _pipeline.log）")

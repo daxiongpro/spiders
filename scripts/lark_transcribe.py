@@ -76,8 +76,43 @@ def trash(path):
     except Exception:
         pass
 
+import threading  # 串稿防护用锁
+
 IIL = re.compile(r'[\\/:*?"<>|\s]')
 SEQ_RE = re.compile(r"seq(\d+)_")
+
+
+# ---- 串稿防护：已知废稿片段黑名单 + 跨线程指纹去重 ----
+# 飞书妙记并发转写时会偶发返回错配/缓存文本，脚本若原样写入会污染成品。
+# 这里在写 MD 前拦截：命中已知废稿，或正文指纹已被其他任务写过，一律判异常。
+_BANNED_FRAGS = (
+    "我做点小生意，用个人收款码收款有问题吗",   # A 组：个人码收款被查/办个体户
+    "如果把全世界的钱就是均分",                  # B 组：老教授/48小时原则
+    "当老板记住一句死理",                        # C 组：赚流水不赚利润
+)
+_fingerprint_seen = set()
+_fingerprint_lock = threading.Lock()
+
+
+def body_fingerprint(body: str) -> str:
+    """取正文前 40 字做指纹，用于跨任务去重。"""
+    return (body or "").strip()[:40]
+
+
+def is_bad_body(body: str) -> bool:
+    """命中黑名单或已被其他任务写过相同指纹 -> 疑似飞书转写错配。"""
+    if not body:
+        return False
+    b = body.strip()
+    for frag in _BANNED_FRAGS:
+        if frag in b[:200]:
+            return True
+    fp = body_fingerprint(b)
+    with _fingerprint_lock:
+        if fp in _fingerprint_seen:
+            return True
+        _fingerprint_seen.add(fp)
+    return False
 
 
 def title20(t: str) -> str:
@@ -266,6 +301,8 @@ def process(mp4, seq, video, cat, use_audio=True, keep=False):
             kw, body = parse_transcript(f.read())
         if not body:
             raise RuntimeError("逐字稿正文为空")
+        if is_bad_body(body):
+            raise RuntimeError("逐字稿命中占位/重复内容，疑似飞书转写错配")
         out = write_md(cat, seq, video, kw, body)
         if not keep:
             # 移入 _trash 而非删除：批量跑会撞「单轮 50 次删除」的安全阈值
@@ -280,7 +317,7 @@ def process(mp4, seq, video, cat, use_audio=True, keep=False):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--seq", type=int, action="append")
-    ap.add_argument("--workers", type=int, default=2)
+    ap.add_argument("--workers", type=int, default=1)
     ap.add_argument("--no-audio", action="store_true")
     ap.add_argument("--keep", action="store_true")
     ap.add_argument("--src", default=TMP_AUDIO)

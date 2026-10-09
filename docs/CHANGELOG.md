@@ -4,6 +4,31 @@
 
 ---
 
+## 2026-09-23 · 串稿修复：内容防护 + 污染隔离
+
+### 改了什么
+1. `scripts/lark_transcribe.py`：新增已知废稿片段黑名单（个人收款码 / 老教授 / 赚流水 三组）+ 正文前 40 字指纹跨线程去重（`is_bad_body`），在 `write_md` 前拦截错配文本，命中即走 FAIL 不污染成品。
+2. `lark_transcribe.py` 与 `run_pipeline.py` 的默认并发 `--workers` 由 2 降为 1，规避飞书妙记并发转写串 token。
+3. 新增 `scripts/_identify_polluted.py`：扫描成品目录、用三组锚点识别串稿并移至 `output/_trash/_polluted/`，同时产出 `docs/日志/2026-09-23_污染清单.txt`（96 个 seq）。
+4. 新增 `scripts/_recover_polluted.py`：读清单批量重抓 + 重转，供抖音接口恢复后一键修复。
+5. 全量备份 `搞钱·事业` 到 `output/_trash/_bak_搞钱_20260923/`。
+
+### 为什么
+- **根因是飞书妙记并发转写错配**：96 篇不同标题 / 链接 / 点赞的视频，口播逐字稿被写成同一段废稿（A/B/C 三组占位文案），时间戳全为单段 `00:00:00.040`，典型缓存串稿。下载阶段已排除（每视频按各自 aid 隔离、frontmatter 链接各不相同）。脚本原拿到 body 直接写文件、无内容校验，是放大器。
+- **防护而非仅删**：只删废稿不治本，下次重跑仍会再污染。加指纹 + 黑名单 + 降并发后，即使飞书再偶发错配，废稿也会被拦下、相关 seq 走 FAIL 等待重试。
+
+### 验证
+- `is_bad_body` 单测：A 组片段命中=True、正常稿不命中=False、相同正文二次调用命中重复指纹=True、B 组片段命中=True。
+- `lark_transcribe.py` `py_compile` 通过。
+- 成品目录：`搞钱·事业` 仅剩 10 篇有效 / 失效占位，96 篇废稿已隔离；备份完整可回滚。
+
+### 已知遗留（重要）
+- **抖音接口当前整体不可用**：`aweme/detail` 与 `list_collections` 均报 `HTTPSConnectionPool(host='www.douyin.com', port=443): Read timed out. (read timeout=20)`——TCP 已连但服务端不回包。登录态 sessionid 仍有效（至 2026-11-09），故排除 cookie 问题；最可能是该 IP 被风控限流或 `a_bogus` 签名失效被静默丢弃。
+- 因此 96 篇的"重新下载"卡在外部依赖，**暂无法自动恢复**。待接口恢复后运行 `python -u scripts/_recover_polluted.py` 即可一键重抓重转（代码已带防护，不会再污染）。
+- 历史 CHANGELOG 记载的「403」已过时——实测现在是 read timeout，不是 403。
+
+---
+
 ## 2026-09-21 · 收藏台账入库
 
 ### 改了什么
