@@ -4,6 +4,22 @@
 
 ---
 
+## 2026-10-09（深夜 2）· 文档：补 step2 的「python 直跑」用法
+
+### 改了什么
+1. `README.md` 「用法」一节：
+   - 修正解释器说明 —— 原先写「具名环境别混用」，实测 `douyin` 环境（3.11.16 + playwright 1.63.0）
+     跑 step1/step2 **完全正常**，只有依赖 `av`/`requests`/`openpyxl` 的旧脚本才必须用 base。
+   - 新增「直接用 `python` 跑」小节：给出 `python -u scripts\step2_download_folder.py ...` 四步命令，
+     并写明前提（必须先 `conda activate douyin`，否则 `python` 会落到 `WindowsApps` 占位程序而静默无输出）。
+
+### 为什么
+用户在 `(douyin)` 环境里想用 `python` 直接跑，不要长路径。
+实测验证：`conda run -n douyin python` 解析到 `envs\douyin\python.exe`，
+`--list` 正常返回 9 个收藏夹且 id 19 位完整（`搞钱·事业 = 7683510189210949416`）。
+
+---
+
 ## 2026-10-09（深夜）· 修 step2 致命 bug：抖音 19 位 id 被 JS 抹掉末位
 
 ### 改了什么

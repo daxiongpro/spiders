@@ -78,11 +78,15 @@ spiders/
 > ⚠️ **Windows 上不要直接敲脚本名**（如 `scripts\step2_download_folder.py`）。
 > 本机 `.py` **没有文件关联**、`py.exe` 不存在、`PATHEXT` 里也没有 `.PY`，
 > 所以 PowerShell 会**静默不执行**——不报错、零输出，看起来像脚本没反应。
-> 要么双击 `.bat`，要么把解释器写全（见下面的例子）。
+> 前面必须带 `python`，或双击 `.bat`。
 
-解释器统一用 **base 环境** `C:\ProgramData\miniforge3\python.exe`：项目其它脚本依赖的
-`av` / `requests` 只装在这里。具名环境（如 `douyin`）虽然也有 playwright，但**别混用**，
-免得出现「A 脚本能跑、B 脚本报缺包」。下面命令都写全路径，复制即可，不受当前激活环境影响。
+解释器怎么选：
+
+- **step1 / step2 只依赖 playwright**，所以 base 和 `douyin` 环境**都能跑**
+  （`douyin` = Python 3.11.16 + playwright 1.63.0，实测 `--list`/下载/增量跳过全通）。
+- 但 `av` / `requests` / `openpyxl` / `pandas` / `lxml` **只装在 base**，
+  所以 `fetch_only.py` / `status.py` / `lark_transcribe.py` 在 `douyin` 下会直接 `ImportError`。
+- 下面命令都写全路径，复制即可，不受当前激活环境影响。
 
 ### 入口 1 · 登录（只需一次）
 
@@ -109,6 +113,25 @@ scripts\step2_download_folder.bat                  # 双击或直接敲，交互
 scripts\step2_download_folder.bat --list           # 也支持带参数，等价于上面的长命令
 scripts\step2_download_folder.bat --check --folder 搞钱
 ```
+
+#### 直接用 `python` 跑（省掉长路径）
+
+如果已经 `conda activate douyin`（或 base），`python` 就在 PATH 上，可以这样写：
+
+```
+python -u scripts\step2_download_folder.py --list                      # ① 看收藏夹
+python -u scripts\step2_download_folder.py --check --folder 搞钱        # ② 只比对本地，不下载
+python -u scripts\step2_download_folder.py --folder 搞钱·事业 --limit 5 # ③ 小样本试水
+python -u scripts\step2_download_folder.py --folder 搞钱·事业           # ④ 全量（自动跳过已下过的）
+```
+
+两条前提：
+
+1. **必须先激活环境**（`conda activate douyin`）。没激活时 `python` 会落到
+   `...\WindowsApps\python.exe`（微软商店的占位程序），敲了等于没反应。
+   确认当前解释器：`python -c "import sys;print(sys.executable)"`，
+   应该指向 `...\envs\douyin\python.exe`。
+2. 在项目根目录执行，或把脚本写成绝对路径（脚本用 `__file__` 定位仓库，cwd 不影响找 `src/paths.py`）。
 
 **增量下载，重复运行很安全**：判定「已下过」看的是 `aweme_id` 而不是文件名，
 且要同时满足「文件存在 + 大于 10KB + 文件头带 `ftyp`」才算数。所以收藏夹新增视频只下新增的、
